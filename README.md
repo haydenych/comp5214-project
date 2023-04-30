@@ -1,4 +1,4 @@
-# COMP5214 Oroject
+# COMP5214 Project
 
 ## Data
 For this project, we will be using the VIMEO-90k triplet dataset.
