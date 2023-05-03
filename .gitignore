@@ -2,6 +2,6 @@
 
 data/**
 
-code/__pycache__/**
+**/__pycache__/**
 code/results/**
 code/checkpoints/**
