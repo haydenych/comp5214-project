@@ -1,3 +1,7 @@
 .ipynb_checkpoints
 
 data/**
+
+code/__pycache__/**
+code/results/**
+code/checkpoints/**
