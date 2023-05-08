@@ -3,6 +3,7 @@ from torchvision.transforms import transforms
 
 from PIL import Image
 import os
+import torch
 
 transform = transforms.Compose(
     [
@@ -37,4 +38,4 @@ class Vimeo90k(Dataset):
         im2 = self.transform(im2)
         im3 = self.transform(im3)
 
-        return im1
+        return torch.stack((im1, im2, im3),0)
