@@ -6,6 +6,8 @@ from diffusers.optimization import get_cosine_schedule_with_warmup
 from torch.utils.data import DataLoader
 import math
 import os
+import sys
+sys.path.insert(1, './taming-transformers')
 from utils import *
 from accelerate import Accelerator
 from huggingface_hub import HfFolder, Repository, whoami
@@ -45,14 +47,14 @@ model = UNet2DModel(
 noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
 timesteps = torch.LongTensor([50])
 
-auto_config = OmegaConf.load("config/16384_model.yaml")
-autoEncoder = vqgan.VQModel(**config.model.params)
-autoEncoder.init_from_ckpt("ckpts/16384_last.ckpt").to(device)
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+auto_config = OmegaConf.load("config/16384_model.yaml")
+autoEncoder = vqgan.VQModel(**auto_config.model.params)
+autoEncoder.init_from_ckpt("ckpts/16384_last.ckpt")
+autoEncoder.to(device)
 
 train_data = Vimeo90k(path_to_dataset='../data/vimeo_triplet/sequences', datalist_filename='../data/vimeo_triplet/tri_trainlist.txt')
-train_dataloader = DataLoader(dataset = train_data, batch_size=4, shuffle=True)
+train_dataloader = DataLoader(dataset = train_data, batch_size=16, shuffle=True)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
 lr_scheduler = get_cosine_schedule_with_warmup(
@@ -61,7 +63,7 @@ lr_scheduler = get_cosine_schedule_with_warmup(
     num_training_steps=(len(train_dataloader) * config.num_epochs),
 )
 
-def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler):
+def train_loop(config, model, autoEncoder, noise_scheduler, optimizer, train_dataloader, lr_scheduler):
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
@@ -88,9 +90,9 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
             img2 = batch[:,1].squeeze().to(device)
             img3 = batch[:,2].squeeze().to(device)
             
-            img1_code = model.encode(img1)
-            img2_code = model.encode(img2)
-            img3_code = model.encode(img3)
+            img1_code, _, _ = autoEncoder.encode(img1)
+            img2_code, _, _ = autoEncoder.encode(img2)
+            img3_code, _, _ = autoEncoder.encode(img3)
             
             noise = torch.randn(img2_code.shape).to(device)
             bs = img2_code.shape[0]
@@ -103,7 +105,7 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
             
             with accelerator.accumulate(model):
                 # Predict the noise residual
-                noise_pred = model(torch.cat(img1_code,noisy_images,img3_code), timesteps, return_dict=False)[0]
+                noise_pred = model(torch.cat((img1_code,noisy_images,img3_code), 1), timesteps, return_dict=False)[0]
                 loss = F.mse_loss(noise_pred, noise)
                 accelerator.backward(loss)
 
@@ -130,6 +132,6 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
     
 from accelerate import notebook_launcher
 
-args = (config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler)
+args = (config, model, autoEncoder, noise_scheduler, optimizer, train_dataloader, lr_scheduler)
 
 notebook_launcher(train_loop, args, num_processes=1)

@@ -19,11 +19,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from utils import *
 
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 config = OmegaConf.load("config/16384_model.yaml")
 model = vqgan.VQModel(**config.model.params)
 model.init_from_ckpt("ckpts/16384_last.ckpt")
+model.to(device)
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 train_data = Vimeo90k(path_to_dataset='../data/vimeo_triplet/sequences', datalist_filename='../data/vimeo_triplet/tri_trainlist.txt')
 train_loader = DataLoader(dataset = train_data, batch_size=4, shuffle=True)

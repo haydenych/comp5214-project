@@ -15,3 +15,6 @@ data/vimeo_triplet/readme.txt
 data/vimeo_triplet/tri_testlist.txt
 data/vimeo_triplet/tri_trainlist.txt
 ```
+
+rmb to edit taming-transformers/taming/data/utils.py 
+torch._six string class to simply str
