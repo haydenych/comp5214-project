@@ -12,7 +12,7 @@ from typing import List, Optional, Tuple, Union
 @dataclass
 class TrainingConfig:
     image_size = 16  # the generated image resolution
-    train_batch_size = 8
+    train_batch_size = 2
     eval_batch_size = 4  # how many images to sample during evaluation
     num_epochs = 50
     gradient_accumulation_steps = 1
@@ -28,6 +28,8 @@ class TrainingConfig:
     hub_private_repo = False
     overwrite_output_dir = True  # overwrite the old model when re-running the notebook
     seed = 0
+    retrain = True
+    starting_epoch = 1
     
 def get_config():
     return TrainingConfig
@@ -39,7 +41,7 @@ def get_unet(config):
     out_channels=256,  # the number of output channels
     layers_per_block=2,  # how many ResNet layers to use per UNet block
     #block_out_channels=(128, 128, 256, 256, 512, 512),  # the number of output channels for each UNet block
-    block_out_channels=(256, 256, 512),
+    block_out_channels=(256, 512, 512),
     down_block_types=(
         # "DownBlock2D",  # a regular ResNet downsampling block
         # "DownBlock2D",
@@ -97,13 +99,16 @@ def evaluate(config, epoch, pipeline):
     os.makedirs(test_dir, exist_ok=True)
     image_grid.save(f"{test_dir}/{epoch:04d}.png")
     
-def gen_result(img_set, pipeline, autoEncoder, num, device):
-    im1_code,_,_ = autoEncoder.encode(img_set[0].unsqueeze(0).to(device))
-    im3_code,_,_ = autoEncoder.encode(img_set[2].unsqueeze(0).to(device))
-    images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator(device='cuda').manual_seed(0))
-    out1 = model.decode(im1_code).detach().cpu()
-    out2 = model.decode(images).detach().cpu()
-    out3 = model.decode(im3_code).detach().cpu()
+def gen_result(img_set, pipeline, autoEncoder, num, device="cuda"):
+    # im1_code,_,_ = autoEncoder.encode(img_set[0].unsqueeze(0).to(device))
+    # im3_code,_,_ = autoEncoder.encode(img_set[2].unsqueeze(0).to(device))
+    im1_code,_,_ = autoEncoder.module.encode(img_set[0].unsqueeze(0))
+    im3_code,_,_ = autoEncoder.module.encode(img_set[2].unsqueeze(0))
+    # images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator(device='cuda').manual_seed(0))
+    images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator().manual_seed(0))
+    out1 = autoEncoder.module.decode(im1_code).detach().cpu()
+    out2 = autoEncoder.module.decode(images).detach().cpu()
+    out3 = autoEncoder.module.decode(im3_code).detach().cpu()
     
     fig = plt.figure(figsize=(10, 7))
     fig.add_subplot(1, 3, 1)
@@ -162,7 +167,8 @@ class self_DDPMPipeline(DDPMPipeline):
         #     image_shape = (batch_size, self.unet.config.in_channels, *self.unet.config.sample_size)
         image_shape = (1,256,16,16)
         #print(self.device)
-        image = torch.randn(image_shape, generator=generator, device=self.device)
+        # image = torch.randn(image_shape, generator=generator, device=self.device)
+        image = torch.randn(image_shape, generator=generator)
 
         # set step values
         self.scheduler.set_timesteps(num_inference_steps)
