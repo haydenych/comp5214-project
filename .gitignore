@@ -1,7 +1,15 @@
 .ipynb_checkpoints
 
-data/**
-
 **/__pycache__/**
+
+data/**
+checkpoints/**
+code/taming-transformers/**
+code/taming/**
+code/vgg_lpips/**
+
+code/sample*
+code/test*
+
 code/results/**
 code/checkpoints/**
