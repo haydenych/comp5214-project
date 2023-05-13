@@ -37,4 +37,4 @@ class Vimeo90k(Dataset):
         im2 = self.transform(im2)
         im3 = self.transform(im3)
 
-        return im1
+        return im1, im2, im3
