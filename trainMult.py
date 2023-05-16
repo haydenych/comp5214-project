@@ -1,6 +1,6 @@
 import os
-# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
-# os.environ["CUDA_VISIBLE_DEVICES"]="5, 7"
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"]="1,2,3,4,5,6,7"
 import sys
 from accelerate import Accelerator, notebook_launcher
 from diffusers import UNet2DModel, DDPMScheduler, DDPMPipeline
@@ -29,9 +29,9 @@ if __name__ == '__main__':
     timesteps = torch.LongTensor([50])
 
     #device = torch.device('cuda')
-    auto_config = OmegaConf.load("config/16384_model.yaml")
+    auto_config = OmegaConf.load("config/model.yaml")
     autoEncoder = vqgan.VQModel(**auto_config.model.params)
-    autoEncoder.init_from_ckpt("ckpts/16384_last.ckpt")
+    autoEncoder.init_from_ckpt("ckpts/model.ckpt")
     #autoEncoder.to(device)
 
     train_data = Vimeo90k(path_to_dataset='../data/vimeo_triplet/sequences', datalist_filename='../data/vimeo_triplet/tri_trainlist.txt')
@@ -49,8 +49,8 @@ if __name__ == '__main__':
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
-        log_with="tensorboard",
         logging_dir=os.path.join(config.output_dir, "logs"),
+        project_dir="output"
     )
     if accelerator.is_main_process:
         if config.output_dir is not None:
@@ -64,6 +64,7 @@ if __name__ == '__main__':
     global_step = 0
     
     for epoch in range(config.num_epochs):
+        #print(autoEncoder.device)
         progress_bar = tqdm(total=len(train_dataloader), disable=not accelerator.is_local_main_process)
         progress_bar.set_description(f"Epoch {epoch}")
         if epoch<= config.starting_epoch:
@@ -71,8 +72,12 @@ if __name__ == '__main__':
         if accelerator.is_main_process and config.retrain:
             if (os.path.exists(config.output_dir)):
                 pipeline = self_DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
-                pipeline.from_pretrained(config.output_dir)
+                #gen_result(fixed_data, pipeline, autoEncoder, epoch)
+                #pipeline.from_pretrained(config.output_dir)
+                #accelerator.save_state("output")
+                accelerator.load_state("output")
                 config.retrain = False
+                #gen_result(fixed_data, pipeline, autoEncoder, epoch)
                 print("loaded", flush=True)
         
         for step, batch in enumerate(train_dataloader):
@@ -127,7 +132,8 @@ if __name__ == '__main__':
             # if (epoch + 1) % config.save_image_epochs == 0 or epoch == config.num_epochs - 1:
             #     evaluate(config, epoch, pipeline)
 
-            if ((epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1) and epoch != 0:
-                pipeline.save_pretrained(config.output_dir)
+            if ((epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1):
+                #pipeline.save_pretrained(config.output_dir)
                 gen_result(fixed_data, pipeline, autoEncoder, epoch)
+                accelerator.save_state("output")
                 print("saved", flush=True)

@@ -11,12 +11,12 @@ from typing import List, Optional, Tuple, Union
 
 @dataclass
 class TrainingConfig:
-    image_size = 16  # the generated image resolution
-    train_batch_size = 2
+    image_size = 32  # the generated image resolution
+    train_batch_size = 4
     eval_batch_size = 4  # how many images to sample during evaluation
-    num_epochs = 50
+    num_epochs = 100
     gradient_accumulation_steps = 1
-    learning_rate = 1e-4
+    learning_rate = 1e-5
     lr_warmup_steps = 500
     save_image_epochs = 1
     save_model_epochs = 1
@@ -29,23 +29,23 @@ class TrainingConfig:
     overwrite_output_dir = True  # overwrite the old model when re-running the notebook
     seed = 0
     retrain = True
-    starting_epoch = 1
-    
+    starting_epoch = 46
+  
 def get_config():
     return TrainingConfig
 
 def get_unet(config):
     return UNet2DModel(
     sample_size=config.image_size,  # the target image resolution
-    in_channels=256*3,  # the number of input channels, 3 for RGB images
-    out_channels=256,  # the number of output channels
+    in_channels=4*3,  # the number of input channels, 3 for RGB images
+    out_channels=4,  # the number of output channels
     layers_per_block=2,  # how many ResNet layers to use per UNet block
     #block_out_channels=(128, 128, 256, 256, 512, 512),  # the number of output channels for each UNet block
-    block_out_channels=(256, 512, 512),
+    block_out_channels=(128, 256, 256, 512),
     down_block_types=(
         # "DownBlock2D",  # a regular ResNet downsampling block
         # "DownBlock2D",
-        #"DownBlock2D",
+        "DownBlock2D",
         "AttnDownBlock2D",
         "AttnDownBlock2D",  # a ResNet downsampling block with spatial self-attention
         "AttnDownBlock2D",
@@ -54,7 +54,7 @@ def get_unet(config):
         "AttnUpBlock2D",  # a regular ResNet upsampling block
         "AttnUpBlock2D",  # a ResNet upsampling block with spatial self-attention
         "AttnUpBlock2D",
-        #"UpBlock2D",
+        "UpBlock2D",
         # "UpBlock2D",
         # "UpBlock2D",
     ),
@@ -99,13 +99,13 @@ def evaluate(config, epoch, pipeline):
     os.makedirs(test_dir, exist_ok=True)
     image_grid.save(f"{test_dir}/{epoch:04d}.png")
     
-def gen_result(img_set, pipeline, autoEncoder, num, device="cuda"):
+def gen_result(img_set, pipeline, autoEncoder, num=0, device="cuda"):
     # im1_code,_,_ = autoEncoder.encode(img_set[0].unsqueeze(0).to(device))
     # im3_code,_,_ = autoEncoder.encode(img_set[2].unsqueeze(0).to(device))
-    im1_code,_,_ = autoEncoder.module.encode(img_set[0].unsqueeze(0))
-    im3_code,_,_ = autoEncoder.module.encode(img_set[2].unsqueeze(0))
+    im1_code,_,_ = autoEncoder.module.encode(img_set[0].unsqueeze(0).to(autoEncoder.device))
+    im3_code,_,_ = autoEncoder.module.encode(img_set[2].unsqueeze(0).to(autoEncoder.device))
     # images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator(device='cuda').manual_seed(0))
-    images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator().manual_seed(0))
+    images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator(device="cpu").manual_seed(0))
     out1 = autoEncoder.module.decode(im1_code).detach().cpu()
     out2 = autoEncoder.module.decode(images).detach().cpu()
     out3 = autoEncoder.module.decode(im3_code).detach().cpu()
@@ -118,6 +118,41 @@ def gen_result(img_set, pipeline, autoEncoder, num, device="cuda"):
     fig.add_subplot(1, 3, 3)
     plt.imshow(image_ten2pil(out3))
     plt.savefig("output_img/res_"+str(num)+".png")
+    
+def gen_view_result(img_set, pipeline, autoEncoder, num=0, device="cuda"):
+    # im1_code,_,_ = autoEncoder.encode(img_set[0].unsqueeze(0).to(device))
+    # im3_code,_,_ = autoEncoder.encode(img_set[2].unsqueeze(0).to(device))
+    im1_code,_,_ = autoEncoder.encode(img_set[:,0].to(autoEncoder.device))
+    im3_code,_,_ = autoEncoder.encode(img_set[:,2].to(autoEncoder.device))
+    # images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator(device='cuda').manual_seed(0))
+    images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=4, generator=torch.Generator(device="cpu").manual_seed(0))
+    out1 = autoEncoder.decode(im1_code).detach().cpu()
+    out2 = autoEncoder.decode(images).detach().cpu()
+    out3 = autoEncoder.decode(im3_code).detach().cpu()
+    
+    fig = plt.figure(figsize=(10, 7))
+    img_num = 3
+    for i in range(img_num):
+        fig.add_subplot(img_num, 3, 1+i*3)
+        plt.imshow(image_ten2pil(out1[i]))
+        fig.add_subplot(img_num, 3, 2+i*3)
+        plt.imshow(image_ten2pil(out2[i]))
+        fig.add_subplot(img_num, 3, 3+i*3)
+        plt.imshow(image_ten2pil(out3[i]))
+    plt.savefig("test.png")    
+    
+def gen_image(img_set, pipeline, autoEncoder, num=0, device="cuda"):
+    # im1_code,_,_ = autoEncoder.encode(img_set[0].unsqueeze(0).to(device))
+    # im3_code,_,_ = autoEncoder.encode(img_set[2].unsqueeze(0).to(device))
+    im1_code,_,_ = autoEncoder.encode(img_set[:,0].to(autoEncoder.device))
+    im3_code,_,_ = autoEncoder.encode(img_set[:,2].to(autoEncoder.device))
+    # images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=1, generator=torch.Generator(device='cuda').manual_seed(0))
+    images = pipeline(im1_code.detach(), im3_code.detach(), batch_size=4, generator=torch.Generator(device="cpu").manual_seed(0))
+    out2 = autoEncoder.decode(images)
+    return out2
+    
+    
+     
     
 class self_DDPMPipeline(DDPMPipeline):
     def __init__(self, unet, scheduler):
@@ -165,10 +200,10 @@ class self_DDPMPipeline(DDPMPipeline):
         #     )
         # else:
         #     image_shape = (batch_size, self.unet.config.in_channels, *self.unet.config.sample_size)
-        image_shape = (1,256,16,16)
+        image_shape = (batch_size,4,32,32)
         #print(self.device)
         # image = torch.randn(image_shape, generator=generator, device=self.device)
-        image = torch.randn(image_shape, generator=generator)
+        image = torch.randn(image_shape, generator=generator).to(self.unet.device)
 
         # set step values
         self.scheduler.set_timesteps(num_inference_steps)

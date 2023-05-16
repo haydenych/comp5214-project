@@ -1,0 +1,8 @@
+version: 6.8.9
+files:
+  - url: Netron-6.8.9-mac.zip
+    sha512: +bqT8Xr+EDwQwa9XzYGLGvImL62PSo5BD/esk8569kO1FiBrTeCgd+Nna1/EqyPj/jNLFhZ3cHqZN7KTaWyY2A==
+    size: 158920315
+path: Netron-6.8.9-mac.zip
+sha512: +bqT8Xr+EDwQwa9XzYGLGvImL62PSo5BD/esk8569kO1FiBrTeCgd+Nna1/EqyPj/jNLFhZ3cHqZN7KTaWyY2A==
+releaseDate: '2023-05-13T05:28:09.230Z'
