@@ -1,5 +1,7 @@
 # COMP5214 Project
 
+The code in the main branch is for Finetuning VQGAN only. For the full code of training the latent diffusion model, please refer to the branch Full_code, which is mostly done by my other teammate. I am too lazy for the clean up :3
+
 ## Data
 For this project, we will be using the VIMEO-90k triplet dataset.
 
